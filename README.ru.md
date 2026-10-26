@@ -135,13 +135,13 @@ THEOS=~/theos make TARGET_SWIFTC=false package FINALPACKAGE=1 DEBUG=0
 
 ---
 
-## Благодарности
+## Credits
 
-- **[Kaldi ASR](https://github.com/kaldi-asr/kaldi)** ([Daniel Povey](https://github.com/danpovey) и команда Kaldi) — за алгоритмы декодирования речи и FST-графы.
-- **[Vosk API](https://github.com/alphacep/vosk-api)** ([Николай Шмырев](https://github.com/nshmyrev) / [Alpha Cephei](https://alphacephei.com/)) — за библиотеку легковесного распознавания речи и предобученные акустические модели.
-- **[invoxiplaygames](https://github.com/invoxiplaygames)** — за фиксы корневых сертификатов TLS, поддержку старых версий iOS и инфраструктуру сообщества Cydia.
-- **[Jay Freeman (saurik)](https://github.com/saurik)** — за создание [Cydia](https://github.com/saurik/cydia), [MobileSubstrate](https://github.com/saurik/cydia-substrate) и экосистему джейлбрейка iOS.
-- **[Theos](https://github.com/theos/theos)** — за современный кроссплатформенный тулчейн разработки твиков.
+- **[Vosk](https://github.com/alphacep/vosk-api)** ([Alpha Cephei](https://alphacephei.com/) / [Николай Шмырев](https://github.com/nshmyrev)) — легковесная библиотека офлайн-распознавания речи и акустические модели.
+- **[Kaldi](https://github.com/kaldi-asr/kaldi)** ([Daniel Povey](https://github.com/danpovey) и команда Kaldi) — алгоритмы FST-декодирования и фреймворк распознавания речи.
+- **[Theos](https://github.com/theos/theos)** — современный инструмент сборки джейлбрейк-твиков для iOS.
+- **[Cydia Substrate](https://github.com/saurik/cydia-substrate)** ([Jay Freeman / saurik](https://github.com/saurik)) — среда хукинга и инъекции кода в процессы iOS.
+- **[invoxiplaygames](https://github.com/invoxiplaygames)** — фиксы корневых сертификатов TLS и инфраструктура для старых версий iOS.
 
 ---
 
