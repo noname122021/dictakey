@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>entry</key>
+	<dict>
+		<key>cell</key>
+		<string>PSLinkCell</string>
+		<key>icon</key>
+		<string>/Library/PreferenceLoader/Preferences/DictaKey.png</string>
+		<key>label</key>
+		<string>DictaKey</string>
+	</dict>
+	<key>title</key>
+	<string>DictaKey</string>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>id</key>
+			<string>DK_MAIN_GROUP</string>
+			<key>label</key>
+			<string>General</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.local.dictakey</string>
+			<key>key</key>
+			<string>enabled</string>
+			<key>id</key>
+			<string>DK_ENABLED</string>
+			<key>label</key>
+			<string>Enabled</string>
+			<key>PostNotification</key>
+			<string>com.local.dictakey.settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>id</key>
+			<string>DK_LANG_GROUP</string>
+			<key>label</key>
+			<string>Keyboard Languages</string>
+			<key>footerText</key>
+			<string>Enable installed languages for speech recognition.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>id</key>
+			<string>DK_ABOUT_GROUP</string>
+			<key>footerText</key>
+			<string>DictaKey v1.0 • Offline Vosk Kaldi ASR for iOS 6&#10;Baked OpenFST ConstFst graphs and mmap dictionaries.</string>
+		</dict>
+	</array>
+</dict>
+</plist>

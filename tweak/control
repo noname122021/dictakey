@@ -1,0 +1,10 @@
+Package: com.noname122021.dictakey
+Name: DictaKey
+Depends: mobilesubstrate, preferenceloader
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Offline multilingual voice dictation keyboard tweak for iOS 6
+Maintainer: noname122021
+Author: noname122021
+Section: Tweaks
+Tag: purpose::extension

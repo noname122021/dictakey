@@ -1,0 +1,144 @@
+diff --git a/src/model.cc b/src/model.cc
+index 035ffee..90180ac 100644
+--- a/src/model.cc
++++ b/src/model.cc
+@@ -17,13 +17,18 @@
+ // For details of possible model layout see doc/models.md section model-structure
+ 
+ #include "model.h"
++#include "mmap_symbol_table.h"
++#include <pthread.h>
+ 
+ #include <sys/stat.h>
+ #include <fst/fst.h>
++#include <fst/const-fst.h>
++#include <fst/flags.h>
+ #include <fst/register.h>
+ #include <fst/matcher-fst.h>
+ #include <fst/extensions/ngram/ngram-fst.h>
+ 
++DECLARE_string(fst_read_mode);
+ 
+ #ifdef HAVE_MKL
+ // We need to set num threads
+@@ -32,6 +37,7 @@
+ 
+ namespace fst {
+ 
++static FstRegisterer<ConstFst<StdArc>> ConstFst_StdArc_registerer;
+ static FstRegisterer<StdOLabelLookAheadFst> OLabelLookAheadFst_StdArc_registerer;
+ static FstRegisterer<NGramFst<StdArc>> NGramFst_StdArc_registerer;
+ 
+@@ -112,6 +118,7 @@ static void KaldiLogHandler(const LogMessageEnvelope &env, const char *message)
+ Model::Model(const char *model_path) : model_path_str_(model_path) {
+ 
+     SetLogHandler(KaldiLogHandler);
++    FLAGS_fst_read_mode = "map";
+ 
+ #ifdef HAVE_MKL
+     mkl_set_num_threads(1);
+@@ -240,6 +247,52 @@ void Model::ReadDataFiles()
+     feature_info_.silence_weighting_config.silence_weight = 1e-3;
+     feature_info_.silence_weighting_config.silence_phones_str = endpoint_config_.silence_phones;
+ 
++    // ---- ветка B: параллельная загрузка HCL(G)/G и disambig ----
++    struct LoadB {
++        std::string hclg_fn;
++        std::string hcl_fn;
++        std::string g_fn;
++        std::string dis_fn;
++        fst::StdFst *hclg_fst = nullptr;
++        fst::StdFst *hcl_fst = nullptr;
++        fst::StdFst *g_fst = nullptr;
++        std::vector<int32> disambig;
++        bool have_disambig = false;
++        pthread_t th = 0;
++    } lb;
++    lb.hclg_fn = hclg_fst_rxfilename_;
++    lb.hcl_fn = hcl_fst_rxfilename_;
++    lb.g_fn = g_fst_rxfilename_;
++    lb.dis_fn = disambig_rxfilename_;
++
++    struct LoadBRunner {
++        static void *Run(void *arg) {
++            LoadB *b = static_cast<LoadB *>(arg);
++            struct stat stt;
++            if (stat(b->hclg_fn.c_str(), &stt) == 0) {
++                KALDI_LOG << "Loading HCLG from " << b->hclg_fn;
++                b->hclg_fst = fst::ReadFstKaldiGeneric(b->hclg_fn);
++                return nullptr;
++            }
++            string g_const = b->g_fn + ".const";
++            string g_to_read = (stat(g_const.c_str(), &stt) == 0) ? g_const : b->g_fn;
++            if (stat(b->hcl_fn.c_str(), &stt) == 0 && stat(g_to_read.c_str(), &stt) == 0) {
++                KALDI_LOG << "Loading HCL and G from " << b->hcl_fn << " " << g_to_read;
++                b->hcl_fst = fst::StdFst::Read(b->hcl_fn);
++                b->g_fst = fst::StdFst::Read(g_to_read);
++                if (stat(b->dis_fn.c_str(), &stt) == 0) {
++                    if (ReadIntegerVectorSimple(b->dis_fn, &b->disambig)) {
++                        b->have_disambig = true;
++                    } else {
++                        KALDI_ERR << "Could not read disambig symbol table from file " << b->dis_fn;
++                    }
++                }
++            }
++            return nullptr;
++        }
++    };
++    pthread_create(&lb.th, nullptr, &LoadBRunner::Run, &lb);
++
+     trans_model_ = new kaldi::TransitionModel();
+     nnet_ = new kaldi::nnet3::AmNnetSimple();
+     {
+@@ -288,16 +341,14 @@ void Model::ReadDataFiles()
+                             &feature_info_.pitch_opts, &feature_info_.pitch_process_opts);
+     }
+ 
+-    if (stat(hclg_fst_rxfilename_.c_str(), &buffer) == 0) {
+-        KALDI_LOG << "Loading HCLG from " << hclg_fst_rxfilename_;
+-        hclg_fst_ = fst::ReadFstKaldiGeneric(hclg_fst_rxfilename_);
+-    } else {
+-        KALDI_LOG << "Loading HCL and G from " << hcl_fst_rxfilename_ << " " << g_fst_rxfilename_;
+-        hcl_fst_ = fst::StdFst::Read(hcl_fst_rxfilename_);
+-        g_fst_ = fst::StdFst::Read(g_fst_rxfilename_);
+-        if (!ReadIntegerVectorSimple(disambig_rxfilename_, &disambig_)) {
+-            KALDI_ERR << "Could not read disambig symbol table from file "
+-                      << disambig_rxfilename_;
++    pthread_join(lb.th, nullptr);
++    if (lb.hclg_fst) {
++        hclg_fst_ = lb.hclg_fst;
++    } else if (lb.hcl_fst) {
++        hcl_fst_ = lb.hcl_fst;
++        g_fst_ = lb.g_fst;
++        if (lb.have_disambig) {
++            disambig_ = lb.disambig;
+         }
+     }
+ 
+@@ -306,12 +357,25 @@ void Model::ReadDataFiles()
+     } else if (g_fst_ && g_fst_->OutputSymbols()) {
+         word_syms_ = g_fst_->OutputSymbols();
+     }
++    if (!word_syms_) {
++        string words_bin_path = model_path_str_ + "/graph/words.bin";
++        string words_txt_bin = model_path_str_ + "/words.bin";
++        if (stat(words_bin_path.c_str(), &buffer) == 0) {
++            KALDI_LOG << "Loading mmap words from " << words_bin_path;
++            word_syms_ = MmapSymbolTable::Load(words_bin_path);
++            word_syms_loaded_ = (word_syms_ != nullptr);
++        } else if (stat(words_txt_bin.c_str(), &buffer) == 0) {
++            KALDI_LOG << "Loading mmap words from " << words_txt_bin;
++            word_syms_ = MmapSymbolTable::Load(words_txt_bin);
++            word_syms_loaded_ = (word_syms_ != nullptr);
++        }
++    }
+     if (!word_syms_) {
+         KALDI_LOG << "Loading words from " << word_syms_rxfilename_;
+         if (!(word_syms_ = fst::SymbolTable::ReadText(word_syms_rxfilename_)))
+             KALDI_ERR << "Could not read symbol table from file "
+                       << word_syms_rxfilename_;
+-        word_syms_loaded_ = word_syms_;
++        word_syms_loaded_ = (word_syms_ != nullptr);
+     }
+     if (!word_syms_) {
+         KALDI_ERR << "Word symbol table empty";
