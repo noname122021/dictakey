@@ -7,7 +7,10 @@
 </p>
 
 <p align="center">
-  <a href="https://noname122021.github.io/cydia-repo/"><img src="https://img.shields.io/badge/Cydia%20Repo-Добавить%20источник-orange.svg" alt="Cydia Repo"></a>
+  <a href="https://noname122021.github.io/cydia-repo/#dictakey"><img src="https://img.shields.io/badge/Cydia%20Repo-Открыть%20репозиторий-orange.svg?style=for-the-badge" alt="Cydia Repo"></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/iOS-6.0%20--%206.1.6-blue.svg" alt="iOS 6.0 - 6.1.6">
   <img src="https://img.shields.io/badge/архитектура-ARMv7%20(32--bit)-success.svg" alt="ARMv7 32-bit">
   <img src="https://img.shields.io/badge/лицензия-MIT%20%2F%20Apache%202.0-lightgrey.svg" alt="License">
@@ -16,6 +19,10 @@
 <p align="center">
   <a href="README.md"><b>English</b></a> • <a href="README.ru.md"><b>Русский</b></a>
 </p>
+
+> ### 📦 **[Открыть DictaKey в репозитории Cydia (GitHub Pages)](https://noname122021.github.io/cydia-repo/#dictakey)**
+> - **Установка в 1 клик на iOS:** [Добавить источник в Cydia (`cydia://`)](cydia://url/https://cydia.saurik.com/api/share#?source=https://noname122021.github.io/cydia-repo/)
+> - **Адрес репозитория для Cydia:** `https://noname122021.github.io/cydia-repo/`
 
 ---
 
