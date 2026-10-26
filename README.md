@@ -137,11 +137,11 @@ See [baking/README.md](baking/README.md) for instructions on compiling Vosk smal
 
 ## Acknowledgements & Credits
 
-- **Daniel Povey & the Kaldi ASR Team**: for the speech recognition framework and FST decoding algorithms.
-- **Nikolay Shmyrev & Alpha Cephei (Vosk)**: for the lightweight offline speech recognition library and pre-trained acoustic models.
-- **invoxiplaygames (IPG)**: for essential legacy iOS root certificates, TLS fixes, and Cydia community infrastructure.
-- **Jay Freeman (saurik)**: for Cydia, MobileSubstrate, and the iOS jailbreak foundation.
-- **Theos Team**: for the modern cross-compilation toolchain for iOS tweaks.
+- **[Kaldi ASR](https://github.com/kaldi-asr/kaldi)** ([Daniel Povey](https://github.com/danpovey) & the Kaldi Team) — speech recognition framework and FST decoding algorithms.
+- **[Vosk API](https://github.com/alphacep/vosk-api)** ([Nikolay Shmyrev](https://github.com/nshmyrev) / [Alpha Cephei](https://alphacephei.com/)) — lightweight offline speech recognition library and pre-trained acoustic models.
+- **[invoxiplaygames](https://github.com/invoxiplaygames)** — essential legacy iOS root certificates, TLS fixes, and Cydia community infrastructure.
+- **[Jay Freeman (saurik)](https://github.com/saurik)** — [Cydia](https://github.com/saurik/cydia), [MobileSubstrate](https://github.com/saurik/cydia-substrate), and the iOS jailbreak foundation.
+- **[Theos](https://github.com/theos/theos)** — modern cross-compilation toolchain for iOS tweak development.
 
 ---
 

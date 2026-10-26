@@ -137,11 +137,11 @@ THEOS=~/theos make TARGET_SWIFTC=false package FINALPACKAGE=1 DEBUG=0
 
 ## Благодарности
 
-- **Daniel Povey и команде Kaldi ASR**: за алгоритмы декодирования речи и FST-графы.
-- **Николаю Шмыреву и Alpha Cephei (Vosk)**: за библиотеку легковесного распознавания речи и предобученные акустические модели.
-- **invoxiplaygames (IPG)**: за фиксы корневых сертификатов TLS, поддержку старых версий iOS и инфраструктуру сообщества Cydia.
-- **Джею Фримену (saurik)**: за создание Cydia, MobileSubstrate и экосистему джейлбрейка iOS.
-- **Команде Theos**: за современный кроссплатформенный тулчейн разработки твиков.
+- **[Kaldi ASR](https://github.com/kaldi-asr/kaldi)** ([Daniel Povey](https://github.com/danpovey) и команда Kaldi) — за алгоритмы декодирования речи и FST-графы.
+- **[Vosk API](https://github.com/alphacep/vosk-api)** ([Николай Шмырев](https://github.com/nshmyrev) / [Alpha Cephei](https://alphacephei.com/)) — за библиотеку легковесного распознавания речи и предобученные акустические модели.
+- **[invoxiplaygames](https://github.com/invoxiplaygames)** — за фиксы корневых сертификатов TLS, поддержку старых версий iOS и инфраструктуру сообщества Cydia.
+- **[Jay Freeman (saurik)](https://github.com/saurik)** — за создание [Cydia](https://github.com/saurik/cydia), [MobileSubstrate](https://github.com/saurik/cydia-substrate) и экосистему джейлбрейка iOS.
+- **[Theos](https://github.com/theos/theos)** — за современный кроссплатформенный тулчейн разработки твиков.
 
 ---
 
