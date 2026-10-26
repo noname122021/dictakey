@@ -60,7 +60,7 @@ for lang, name, folder in MODELS:
 Name: DictaKey Model ({name})
 Version: 1.0.0
 Architecture: iphoneos-arm
-Description: Baked Vosk Kaldi speech recognition model for {name} on iOS 6. Requires DictaKey.
+Description: Baked Vosk Kaldi speech recognition model on iOS 6. Requires DictaKey.
 Maintainer: noname122021
 Author: noname122021
 Section: Addons (DictaKey)
