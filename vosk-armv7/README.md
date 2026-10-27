@@ -1,6 +1,6 @@
 # Vosk Speech Recognition Engine (ARMv7 iOS 6 Port)
 
-This directory contains the prebuilt static library `libvosk.a`, C/C++ headers, and patches required to run offline Kaldi/Vosk speech recognition on 32-bit ARMv7 iOS 6 devices (Apple A5: iPad 2, iPad mini 1, iPhone 4S; Apple A6: iPhone 5).
+This directory contains the prebuilt static library `libvosk.a`, C/C++ headers, and patches required to run offline Kaldi/Vosk speech recognition on 32-bit ARMv7 iOS 6 devices (Apple A4: iPhone 4, iPod touch 4; Apple A5: iPad 2, iPad mini 1, iPhone 4S; Apple A6: iPhone 5).
 
 ---
 

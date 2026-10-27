@@ -72,8 +72,8 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
 
 - **Dynamic Cydia / APT Model Distribution & Pre-Baked Caches**
   - Base tweak package is ultra-lightweight (**4.2 MB**).
-  - Heavy Kaldi recognition models are distributed as modular Cydia `.deb` packages (`com.noname122021.dictakey-model-<lang>`).
-  - All 7 language models come pre-baked with kernel mmap-aligned `HCLr.fst` graphs and pre-computed acoustic/i-vector covariance caches (`final.mdl.cache`, `final.ie.cache`), cutting cold model initialization time in half.
+  - Heavy Kaldi recognition models are distributed as modular Cydia `.deb` packages (14 packages across 7 languages, offering both Regular and Small variants).
+  - All 14 models come pre-baked with kernel mmap-aligned `HCLr.fst` graphs and pre-computed acoustic/i-vector covariance caches (`final.mdl.cache`, `final.ie.cache`), cutting cold model initialization time in half.
   - PreferenceLoader settings panel dynamically scans `/var/mobile/Library/vosk/` for installed models. Only installed languages appear as toggle switches, resolved automatically to localized names via `[NSLocale currentLocale]`.
 
 ---
@@ -87,8 +87,10 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
    https://noname122021.github.io/cydia-repo/
    ```
    *(Or open that URL in Safari on your device and tap **Add to Cydia**)*.
-4. Search for and install **DictaKey**.
-5. Install whichever **DictaKey Model (<Language>)** packages you need.
+4. Search for and install **DictaKey** (under **Sections** $\to$ **Tweaks**).
+5. Install your language models (under **Sections** $\to$ **Addons (DictaKey)**):
+   - **Regular models** (`DictaKey Model: <Language>`): full vocabulary for dual-core devices (iPad 2/3/4/mini, iPhone 4S/5).
+   - **Small models** (`DictaKey Model: <Language> (Small)`): lightweight 15k vocabulary optimized for single-core devices (iPhone 4, iPod touch 4).
 
 ---
 
