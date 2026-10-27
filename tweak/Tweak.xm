@@ -4,6 +4,7 @@
 #import <pthread.h>
 #import <substrate.h>
 #import <dlfcn.h>
+#import <math.h>
 #import "vosk_api.h"
 
 @interface PSSpecifier : NSObject
@@ -263,12 +264,16 @@ static NSString *ModelPathForLang(NSString *lang) {
 static double s_lastActivityTime = 0;
 
 static void FreeLoadedModel(void) {
+    if (g_rec) {
+        vosk_recognizer_free(g_rec);
+        g_rec = NULL;
+    }
     if (g_model) {
         vosk_model_free(g_model);
         g_model = NULL;
         [g_loadedModelLang release];
         g_loadedModelLang = nil;
-        DBGLog(@"model freed from memory");
+        DBGLog(@"model and recognizer freed from memory");
     }
 }
 
@@ -276,7 +281,7 @@ static void EnsureModelLoadedForLang(NSString *lang) {
     static volatile BOOL s_loading = NO;
     if (s_loading) return;
     s_lastActivityTime = [NSDate timeIntervalSinceReferenceDate];
-    if (g_model && [g_loadedModelLang isEqualToString:lang]) return;
+    if (g_model && g_rec && [g_loadedModelLang isEqualToString:lang]) return;
     if ([NSBundle.mainBundle.bundleIdentifier isEqualToString:@"com.apple.springboard"]) return;
     
     NSString *path = ModelPathForLang(lang);
@@ -285,6 +290,10 @@ static void EnsureModelLoadedForLang(NSString *lang) {
     s_loading = YES;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         double t0 = [NSDate timeIntervalSinceReferenceDate];
+        if (g_rec) {
+            vosk_recognizer_free(g_rec);
+            g_rec = NULL;
+        }
         if (g_model) {
             vosk_model_free(g_model);
             g_model = NULL;
@@ -294,13 +303,15 @@ static void EnsureModelLoadedForLang(NSString *lang) {
         g_model = vosk_model_new([path UTF8String]);
         if (g_model) {
             g_loadedModelLang = [lang copy];
+            g_rec = vosk_recognizer_new(g_model, 16000.0);
         }
         s_lastActivityTime = [NSDate timeIntervalSinceReferenceDate];
-        DBGLog([NSString stringWithFormat:@"model-%@ loaded %.1fs ok=%d",
-            lang, [NSDate timeIntervalSinceReferenceDate] - t0, g_model != nil]);
+        DBGLog([NSString stringWithFormat:@"model-%@ loaded %.1fs ok=%d rec=%d",
+            lang, [NSDate timeIntervalSinceReferenceDate] - t0, g_model != nil, g_rec != nil]);
         s_loading = NO;
     });
 }
+
 
 // ---- RemoteIO Audio Engine ----
 static char s_recbuf[16384];
@@ -394,23 +405,120 @@ static void StopAudio(void) {
     }
 }
 
-// ---- Decoder Worker Thread ----
+// ---- Decoder Worker Thread with Fast VAD ----
+#define VAD_FRAME_SAMPLES 320 // 20ms at 16kHz
+#define VAD_FRAME_BYTES (VAD_FRAME_SAMPLES * 2) // 640 bytes
+#define VAD_PRE_FRAMES 15 // 300ms pre-speech buffer
+#define VAD_HANGOVER_FRAMES 20 // 400ms hangover
+#define VAD_ENERGY_THRESHOLD 10000 // sum(abs(sample)) for 320 samples (mean abs > 31.25)
+
+static inline int is_speech_frame(const short *samples) {
+    long sum = 0;
+    for (int i = 0; i < VAD_FRAME_SAMPLES; i++) {
+        short s = samples[i];
+        sum += (s >= 0 ? s : -s);
+    }
+    return (sum >= VAD_ENERGY_THRESHOLD);
+}
+
 static void *WorkerFn(void *arg) {
     s_recording = YES;
     s_workerAlive = YES;
     double lastPartialT = 0;
+
+    short pre_buf[VAD_PRE_FRAMES][VAD_FRAME_SAMPLES];
+    int pre_head = 0, pre_count = 0;
+    int is_speech = 0;
+    int hangover = 0;
+
+    short chunk[3200];
+    int chunk_filled = 0;
+
     while (!s_worker_quit) {
         long w = s_rb_w, r = s_rb_r;
-        if (w == r) { usleep(20000); continue; }
-        static char chunk[16000];
         long avail = w - r; if (avail < 0) avail += RB_SIZE;
-        long take = avail > 16000 ? 16000 : avail;
-        for (long i = 0; i < take; i++) chunk[i] = s_rb[(r + i) % RB_SIZE];
-        s_rb_r = r + take;
-        BOOL done = vosk_recognizer_accept_waveform(g_rec, chunk, (int)take) != 0;
+        if (avail < VAD_FRAME_BYTES) {
+            usleep(10000);
+            continue;
+        }
+
+        short frame[VAD_FRAME_SAMPLES];
+        for (int i = 0; i < VAD_FRAME_BYTES; i++) {
+            ((char *)frame)[i] = s_rb[(r + i) % RB_SIZE];
+        }
+        s_rb_r = r + VAD_FRAME_BYTES;
+
+        int frame_is_speech = is_speech_frame(frame);
+        int send_frame = 0;
+
+        if (frame_is_speech) {
+            if (!is_speech) {
+                is_speech = 1;
+                if (pre_count > 0) {
+                    int start = (pre_head - pre_count + VAD_PRE_FRAMES) % VAD_PRE_FRAMES;
+                    for (int k = 0; k < pre_count; k++) {
+                        int f_idx = (start + k) % VAD_PRE_FRAMES;
+                        memcpy(&chunk[chunk_filled], pre_buf[f_idx], VAD_FRAME_BYTES);
+                        chunk_filled += VAD_FRAME_SAMPLES;
+                        if (chunk_filled >= 3200) {
+                            vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                            chunk_filled = 0;
+                        }
+                    }
+                    pre_count = 0;
+                }
+            }
+            hangover = VAD_HANGOVER_FRAMES;
+            send_frame = 1;
+        } else {
+            if (is_speech) {
+                if (hangover > 0) {
+                    hangover--;
+                    send_frame = 1;
+                } else {
+                    is_speech = 0;
+                    send_frame = 0;
+                }
+            } else {
+                send_frame = 0;
+            }
+        }
+
+        if (send_frame) {
+            memcpy(&chunk[chunk_filled], frame, VAD_FRAME_BYTES);
+            chunk_filled += VAD_FRAME_SAMPLES;
+            if (chunk_filled >= 3200) {
+                BOOL done = vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled) != 0;
+                chunk_filled = 0;
+                if (done) {
+                    ClearPartial();
+                    NSString *seg = JsonText(vosk_recognizer_result(g_rec), @"text");
+                    if (seg.length) {
+                        NSString *lang = g_loadedModelLang ?: @"ru";
+                        NSString *fmt = ApplyPunctuation(seg, lang);
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (s_lastWasSpace && ([fmt hasPrefix:@","] || [fmt hasPrefix:@":"] || [fmt hasPrefix:@"—"])) {
+                                DeleteBack(1);
+                            }
+                            InsertText([fmt stringByAppendingString:@" "]);
+                            s_lastWasSpace = YES;
+                        });
+                    }
+                }
+            }
+        } else {
+            memcpy(pre_buf[pre_head], frame, VAD_FRAME_BYTES);
+            pre_head = (pre_head + 1) % VAD_PRE_FRAMES;
+            if (pre_count < VAD_PRE_FRAMES) pre_count++;
+        }
+
         double now = [NSDate timeIntervalSinceReferenceDate];
-        if (now - lastPartialT > 0.25) {
+        if (is_speech && (now - lastPartialT > 0.20)) {
             lastPartialT = now;
+            if (chunk_filled > 0) {
+                vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                chunk_filled = 0;
+            }
             const char *pr = vosk_recognizer_partial_result(g_rec);
             NSString *pt = JsonText(pr, @"partial") ?: @"";
             if (![pt isEqualToString:g_lastPartial]) {
@@ -423,21 +531,11 @@ static void *WorkerFn(void *arg) {
                 });
             }
         }
-        if (done) {
-            ClearPartial();
-            NSString *seg = JsonText(vosk_recognizer_result(g_rec), @"text");
-            if (seg.length) {
-                NSString *lang = g_loadedModelLang ?: @"ru";
-                NSString *fmt = ApplyPunctuation(seg, lang);
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (s_lastWasSpace && ([fmt hasPrefix:@","] || [fmt hasPrefix:@":"] || [fmt hasPrefix:@"—"])) {
-                        DeleteBack(1);
-                    }
-                    InsertText([fmt stringByAppendingString:@" "]);
-                    s_lastWasSpace = YES;
-                });
-            }
-        }
+    }
+
+    if (chunk_filled > 0 && g_rec) {
+        vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+        chunk_filled = 0;
     }
     return NULL;
 }
@@ -451,16 +549,15 @@ static void StartRecordingFull(void) {
     StartAudio();
     SetState(1); // Audio recording starts immediately
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        if (!g_model || ![g_loadedModelLang isEqualToString:lang]) {
-            for (int i = 0; i < 600 && (!g_model || ![g_loadedModelLang isEqualToString:lang]); i++)
+        if (!g_model || !g_rec || ![g_loadedModelLang isEqualToString:lang]) {
+            for (int i = 0; i < 600 && (!g_model || !g_rec || ![g_loadedModelLang isEqualToString:lang]); i++)
                 usleep(50000);
-            if (!g_model) {
+            if (!g_model || !g_rec) {
                 dispatch_async(dispatch_get_main_queue(), ^{ SetState(0); StopAudio(); });
                 return;
             }
         }
         if (s_worker_quit) return;
-        g_rec = vosk_recognizer_new(g_model, 16000.0);
         if (pthread_create(&s_worker, NULL, WorkerFn, NULL) != 0)
             s_workerAlive = NO;
         else
@@ -471,7 +568,7 @@ static void StartRecordingFull(void) {
 static void StopRecordingBg(void) {
     double t0 = [NSDate timeIntervalSinceReferenceDate];
     StopAudio();
-    for (int i = 0; i < 600 && !g_model; i++) usleep(50000);
+    for (int i = 0; i < 600 && (!g_model || !g_rec); i++) usleep(50000);
     for (int i = 0; i < 100 && !s_workerAlive && g_model; i++) usleep(20000);
     s_worker_quit = YES;
     if (s_workerAlive) {
@@ -494,7 +591,7 @@ static void StopRecordingBg(void) {
                 });
             }
         } @catch (id e) { DBGLog(@"final exc"); }
-        vosk_recognizer_free(g_rec); g_rec = NULL;
+        vosk_recognizer_reset(g_rec);
         DBGLog([NSString stringWithFormat:@"stop %.1fs cb=%ld bytes=%ld drop=%ld",
             [NSDate timeIntervalSinceReferenceDate] - t0, g_cbCount, g_cbBytes, g_dropBytes]);
     }
@@ -894,6 +991,15 @@ static void Reposition(void) {
     if (!allowed || !modelPath) {
         if (g_btn) g_btn.hidden = YES;
         return;
+    }
+
+    id traits = [kb respondsToSelector:@selector(textInputTraits)] ? [kb performSelector:@selector(textInputTraits)] : nil;
+    if (traits && [traits respondsToSelector:@selector(keyboardType)]) {
+        int kt = (int)[traits performSelector:@selector(keyboardType)];
+        if (kt == 3 || kt == 4 || kt == 5 || kt == 8 || kt == 10) {
+            if (g_btn) g_btn.hidden = YES;
+            return;
+        }
     }
 
     [DKBridge cancelIdleCheck];
