@@ -11,7 +11,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-ru-small"),
         ("Replaces", "com.noname122021.dictakey-model-ru-small"),
     ]),
-    ("ru-small", "Russian Small (Русский Компактный)", "vosk-model-small-ru-0.22-small", "model-ru", [
+    ("ru-small", "Russian Small (Русский)", "vosk-model-small-ru-0.22-small", "model-ru", [
         ("Provides", "com.noname122021.dictakey-model-ru"),
         ("Conflicts", "com.noname122021.dictakey-model-ru"),
         ("Replaces", "com.noname122021.dictakey-model-ru"),
@@ -21,7 +21,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-en-small"),
         ("Replaces", "com.noname122021.dictakey-model-en-small"),
     ]),
-    ("en-small", "English Small (Английский Компактный)", "vosk-model-small-en-us-0.15-small", "model-en", [
+    ("en-small", "English Small (US)", "vosk-model-small-en-us-0.15-small", "model-en", [
         ("Provides", "com.noname122021.dictakey-model-en"),
         ("Conflicts", "com.noname122021.dictakey-model-en"),
         ("Replaces", "com.noname122021.dictakey-model-en"),
@@ -31,7 +31,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-de-small"),
         ("Replaces", "com.noname122021.dictakey-model-de-small"),
     ]),
-    ("de-small", "German Small (Немецкий Компактный)", "vosk-model-small-de-0.15-small", "model-de", [
+    ("de-small", "German Small (Deutsch)", "vosk-model-small-de-0.15-small", "model-de", [
         ("Provides", "com.noname122021.dictakey-model-de"),
         ("Conflicts", "com.noname122021.dictakey-model-de"),
         ("Replaces", "com.noname122021.dictakey-model-de"),
@@ -41,7 +41,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-fr-small"),
         ("Replaces", "com.noname122021.dictakey-model-fr-small"),
     ]),
-    ("fr-small", "French Small (Французский Компактный)", "vosk-model-small-fr-0.22-small", "model-fr", [
+    ("fr-small", "French Small (Français)", "vosk-model-small-fr-0.22-small", "model-fr", [
         ("Provides", "com.noname122021.dictakey-model-fr"),
         ("Conflicts", "com.noname122021.dictakey-model-fr"),
         ("Replaces", "com.noname122021.dictakey-model-fr"),
@@ -51,7 +51,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-es-small"),
         ("Replaces", "com.noname122021.dictakey-model-es-small"),
     ]),
-    ("es-small", "Spanish Small (Испанский Компактный)", "vosk-model-small-es-0.42-small", "model-es", [
+    ("es-small", "Spanish Small (Español)", "vosk-model-small-es-0.42-small", "model-es", [
         ("Provides", "com.noname122021.dictakey-model-es"),
         ("Conflicts", "com.noname122021.dictakey-model-es"),
         ("Replaces", "com.noname122021.dictakey-model-es"),
@@ -61,7 +61,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-it-small"),
         ("Replaces", "com.noname122021.dictakey-model-it-small"),
     ]),
-    ("it-small", "Italian Small (Итальянский Компактный)", "vosk-model-small-it-0.22-small", "model-it", [
+    ("it-small", "Italian Small (Italiano)", "vosk-model-small-it-0.22-small", "model-it", [
         ("Provides", "com.noname122021.dictakey-model-it"),
         ("Conflicts", "com.noname122021.dictakey-model-it"),
         ("Replaces", "com.noname122021.dictakey-model-it"),
@@ -71,7 +71,7 @@ MODELS = [
         ("Conflicts", "com.noname122021.dictakey-model-uk-small"),
         ("Replaces", "com.noname122021.dictakey-model-uk-small"),
     ]),
-    ("uk-small", "Ukrainian Small (Українська Компактна)", "vosk-model-small-uk-v3-nano-small", "model-uk", [
+    ("uk-small", "Ukrainian Small (Українська)", "vosk-model-small-uk-v3-nano-small", "model-uk", [
         ("Provides", "com.noname122021.dictakey-model-uk"),
         ("Conflicts", "com.noname122021.dictakey-model-uk"),
         ("Replaces", "com.noname122021.dictakey-model-uk"),
