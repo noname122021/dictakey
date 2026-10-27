@@ -6,72 +6,86 @@ import tarfile
 import subprocess
 
 MODELS = [
-    ("ru", "Russian (Русский)", "vosk-model-small-ru-0.22", "model-ru", [
+    ("ru", "DictaKey Model: Russian", "vosk-model-small-ru-0.22", "model-ru",
+     "Russian — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-ru-small"),
         ("Conflicts", "com.noname122021.dictakey-model-ru-small"),
         ("Replaces", "com.noname122021.dictakey-model-ru-small"),
     ]),
-    ("ru-small", "Russian Small (Русский)", "vosk-model-small-ru-0.22-small", "model-ru", [
+    ("ru-small", "DictaKey Model: Russian (Small)", "vosk-model-small-ru-0.22-small", "model-ru",
+     "Russian (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-ru"),
         ("Conflicts", "com.noname122021.dictakey-model-ru"),
         ("Replaces", "com.noname122021.dictakey-model-ru"),
     ]),
-    ("en", "English (US)", "vosk-model-small-en-us-0.15", "model-en", [
+    ("en", "DictaKey Model: English", "vosk-model-small-en-us-0.15", "model-en",
+     "English — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-en-small"),
         ("Conflicts", "com.noname122021.dictakey-model-en-small"),
         ("Replaces", "com.noname122021.dictakey-model-en-small"),
     ]),
-    ("en-small", "English Small (US)", "vosk-model-small-en-us-0.15-small", "model-en", [
+    ("en-small", "DictaKey Model: English (Small)", "vosk-model-small-en-us-0.15-small", "model-en",
+     "English (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-en"),
         ("Conflicts", "com.noname122021.dictakey-model-en"),
         ("Replaces", "com.noname122021.dictakey-model-en"),
     ]),
-    ("de", "German (Deutsch)", "vosk-model-small-de-0.15", "model-de", [
+    ("de", "DictaKey Model: German", "vosk-model-small-de-0.15", "model-de",
+     "German — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-de-small"),
         ("Conflicts", "com.noname122021.dictakey-model-de-small"),
         ("Replaces", "com.noname122021.dictakey-model-de-small"),
     ]),
-    ("de-small", "German Small (Deutsch)", "vosk-model-small-de-0.15-small", "model-de", [
+    ("de-small", "DictaKey Model: German (Small)", "vosk-model-small-de-0.15-small", "model-de",
+     "German (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-de"),
         ("Conflicts", "com.noname122021.dictakey-model-de"),
         ("Replaces", "com.noname122021.dictakey-model-de"),
     ]),
-    ("fr", "French (Français)", "vosk-model-small-fr-0.22", "model-fr", [
+    ("fr", "DictaKey Model: French", "vosk-model-small-fr-0.22", "model-fr",
+     "French — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-fr-small"),
         ("Conflicts", "com.noname122021.dictakey-model-fr-small"),
         ("Replaces", "com.noname122021.dictakey-model-fr-small"),
     ]),
-    ("fr-small", "French Small (Français)", "vosk-model-small-fr-0.22-small", "model-fr", [
+    ("fr-small", "DictaKey Model: French (Small)", "vosk-model-small-fr-0.22-small", "model-fr",
+     "French (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-fr"),
         ("Conflicts", "com.noname122021.dictakey-model-fr"),
         ("Replaces", "com.noname122021.dictakey-model-fr"),
     ]),
-    ("es", "Spanish (Español)", "vosk-model-small-es-0.42", "model-es", [
+    ("es", "DictaKey Model: Spanish", "vosk-model-small-es-0.42", "model-es",
+     "Spanish — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-es-small"),
         ("Conflicts", "com.noname122021.dictakey-model-es-small"),
         ("Replaces", "com.noname122021.dictakey-model-es-small"),
     ]),
-    ("es-small", "Spanish Small (Español)", "vosk-model-small-es-0.42-small", "model-es", [
+    ("es-small", "DictaKey Model: Spanish (Small)", "vosk-model-small-es-0.42-small", "model-es",
+     "Spanish (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-es"),
         ("Conflicts", "com.noname122021.dictakey-model-es"),
         ("Replaces", "com.noname122021.dictakey-model-es"),
     ]),
-    ("it", "Italian (Italiano)", "vosk-model-small-it-0.22", "model-it", [
+    ("it", "DictaKey Model: Italian", "vosk-model-small-it-0.22", "model-it",
+     "Italian — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-it-small"),
         ("Conflicts", "com.noname122021.dictakey-model-it-small"),
         ("Replaces", "com.noname122021.dictakey-model-it-small"),
     ]),
-    ("it-small", "Italian Small (Italiano)", "vosk-model-small-it-0.22-small", "model-it", [
+    ("it-small", "DictaKey Model: Italian (Small)", "vosk-model-small-it-0.22-small", "model-it",
+     "Italian (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-it"),
         ("Conflicts", "com.noname122021.dictakey-model-it"),
         ("Replaces", "com.noname122021.dictakey-model-it"),
     ]),
-    ("uk", "Ukrainian (Українська)", "vosk-model-small-uk-v3-nano", "model-uk", [
+    ("uk", "DictaKey Model: Ukrainian", "vosk-model-small-uk-v3-nano", "model-uk",
+     "Ukrainian — offline speech recognition model for DictaKey (full vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-uk-small"),
         ("Conflicts", "com.noname122021.dictakey-model-uk-small"),
         ("Replaces", "com.noname122021.dictakey-model-uk-small"),
     ]),
-    ("uk-small", "Ukrainian Small (Українська)", "vosk-model-small-uk-v3-nano-small", "model-uk", [
+    ("uk-small", "DictaKey Model: Ukrainian (Small)", "vosk-model-small-uk-v3-nano-small", "model-uk",
+     "Ukrainian (Small) — lightweight offline speech recognition model for DictaKey (compact vocabulary).", [
         ("Provides", "com.noname122021.dictakey-model-uk"),
         ("Conflicts", "com.noname122021.dictakey-model-uk"),
         ("Replaces", "com.noname122021.dictakey-model-uk"),
@@ -90,7 +104,7 @@ if os.path.exists(WORK_DIR):
     shutil.rmtree(WORK_DIR)
 os.makedirs(WORK_DIR, exist_ok=True)
 
-for lang, name, folder, symlink_name, extra_fields in MODELS:
+for lang, name, folder, symlink_name, desc, extra_fields in MODELS:
     tar_file = os.path.join(ASSETS_DIR, f"dictakey-model-{lang}.tar.gz")
     if not os.path.exists(tar_file):
         print(f"Skipping {lang}: {tar_file} not found")
@@ -123,10 +137,10 @@ for lang, name, folder, symlink_name, extra_fields in MODELS:
     if extra_lines:
         extra_lines += "\n"
     control_content = f"""Package: {pkg_id}
-Name: DictaKey Model ({name})
+Name: {name}
 Version: 1.0.0
 Architecture: iphoneos-arm
-Description: Baked Vosk Kaldi speech recognition model on iOS 6. Requires DictaKey.
+Description: {desc}
 Maintainer: noname122021
 Author: noname122021
 Section: Addons (DictaKey)
