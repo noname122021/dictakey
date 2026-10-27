@@ -36,7 +36,7 @@
 
 ## Overview
 
-**DictaKey** brings modern, completely offline, on-device voice dictation to legacy iOS 6 devices (Apple A5/A6, 32-bit ARMv7). It integrates a skeuomorphic microphone dictation key into the native iOS keyboard, streams audio via a low-latency ring buffer directly to a Kaldi neural acoustic model, and types recognized words into any text field in real time.
+**DictaKey** brings modern, completely offline, on-device voice dictation to legacy iOS 6 devices (Apple A4/A5/A6, 32-bit ARMv7). It integrates a skeuomorphic microphone dictation key into the native iOS keyboard, streams audio via a low-latency ring buffer directly to a Kaldi neural acoustic model, and types recognized words into any text field in real time.
 
 DictaKey requires **no internet connection**, **no external servers**, and **no Siri services**. All speech recognition runs entirely on the device processor.
 

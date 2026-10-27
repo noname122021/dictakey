@@ -864,11 +864,21 @@ static NSString *DKLoc(NSString *key) {
 
 static CGRect RectFor(UIView *kb) {
     CGFloat kw = kb.bounds.size.width, kh = kb.bounds.size.height;
-    if (kw > kh)
-        return CGRectMake(819 * kw / 1024.0, 267 * kh / 352.0,
-                          110 * kw / 1024.0, 79 * kh / 352.0 - 2);
-    return CGRectMake(615 * kw / 768.0, 200 * kh / 264.0,
-                      82 * kw / 768.0, 60 * kh / 264.0 - 2);
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        if (kw > 800.0)
+            return CGRectMake(819 * kw / 1024.0, 267 * kh / 352.0,
+                              110 * kw / 1024.0, 79 * kh / 352.0 - 2);
+        return CGRectMake(615 * kw / 768.0, 200 * kh / 264.0,
+                          82 * kw / 768.0, 60 * kh / 264.0 - 2);
+    }
+    // iPhone / iPod touch: place immediately to the left of the space bar
+    if (kw > 350.0) { // landscape (480x162 on iPhone 4)
+        // Globe is (50 125; 44 36), Space starts at x=98
+        return CGRectMake(98.0, 125.0, 44.0, 34.0);
+    }
+    // portrait (320x216 on iPhone 4)
+    // Globe is at 42..76, Space starts at x=80, top=173, height=40 (key body 37, matches Space/Globe)
+    return CGRectMake(80.0, 173.0, 34.0, 40.0);
 }
 
 static void Reposition(void) {

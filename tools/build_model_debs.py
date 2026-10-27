@@ -6,16 +6,25 @@ import tarfile
 import subprocess
 
 MODELS = [
-    ("ru", "Russian (Русский)", "vosk-model-small-ru-0.22"),
-    ("en", "English (US)", "vosk-model-small-en-us-0.15"),
-    ("uk", "Ukrainian (Українська)", "vosk-model-small-uk-v3-nano"),
-    ("de", "German (Deutsch)", "vosk-model-small-de-0.15"),
-    ("fr", "French (Français)", "vosk-model-small-fr-0.22"),
-    ("es", "Spanish (Español)", "vosk-model-small-es-0.42"),
-    ("it", "Italian (Italiano)", "vosk-model-small-it-0.22"),
+    ("ru", "Russian (Русский)", "vosk-model-small-ru-0.22", "model-ru", [
+        ("Provides", "com.noname122021.dictakey-model-ru-small"),
+        ("Conflicts", "com.noname122021.dictakey-model-ru-small"),
+        ("Replaces", "com.noname122021.dictakey-model-ru-small"),
+    ]),
+    ("ru-small", "Russian Small (Русский Компактный)", "vosk-model-small-ru-0.22-small", "model-ru", [
+        ("Provides", "com.noname122021.dictakey-model-ru"),
+        ("Conflicts", "com.noname122021.dictakey-model-ru"),
+        ("Replaces", "com.noname122021.dictakey-model-ru"),
+    ]),
+    ("en", "English (US)", "vosk-model-small-en-us-0.15", "model-en", []),
+    ("uk", "Ukrainian (Українська)", "vosk-model-small-uk-v3-nano", "model-uk", []),
+    ("de", "German (Deutsch)", "vosk-model-small-de-0.15", "model-de", []),
+    ("fr", "French (Français)", "vosk-model-small-fr-0.22", "model-fr", []),
+    ("es", "Spanish (Español)", "vosk-model-small-es-0.42", "model-es", []),
+    ("it", "Italian (Italiano)", "vosk-model-small-it-0.22", "model-it", []),
 ]
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ASSETS_DIR = os.path.join(ROOT_DIR, "release-assets")
 DEBS_DIR = os.path.join(ASSETS_DIR, "debs")
 CYDIA_DEBS_DIR = os.path.join(ROOT_DIR, "cydia-repo", "debs")
@@ -27,7 +36,7 @@ if os.path.exists(WORK_DIR):
     shutil.rmtree(WORK_DIR)
 os.makedirs(WORK_DIR, exist_ok=True)
 
-for lang, name, folder in MODELS:
+for lang, name, folder, symlink_name, extra_fields in MODELS:
     tar_file = os.path.join(ASSETS_DIR, f"dictakey-model-{lang}.tar.gz")
     if not os.path.exists(tar_file):
         print(f"Skipping {lang}: {tar_file} not found")
@@ -50,12 +59,15 @@ for lang, name, folder in MODELS:
         tar.extractall(path=vosk_dir)
 
     # Create relative symlink: model-<lang> -> <folder>
-    symlink_path = os.path.join(vosk_dir, f"model-{lang}")
+    symlink_path = os.path.join(vosk_dir, symlink_name)
     if os.path.islink(symlink_path) or os.path.exists(symlink_path):
         os.remove(symlink_path)
     os.symlink(folder, symlink_path)
 
     # Control file
+    extra_lines = "\n".join(f"{k}: {v}" for k, v in extra_fields)
+    if extra_lines:
+        extra_lines += "\n"
     control_content = f"""Package: {pkg_id}
 Name: DictaKey Model ({name})
 Version: 1.0.0
@@ -65,7 +77,7 @@ Maintainer: noname122021
 Author: noname122021
 Section: Addons (DictaKey)
 Depends: com.noname122021.dictakey (>= 1.0.0)
-Tag: purpose::extension
+{extra_lines}Tag: purpose::extension
 """
     with open(os.path.join(debian_dir, "control"), "w", encoding="utf-8") as f:
         f.write(control_content)
