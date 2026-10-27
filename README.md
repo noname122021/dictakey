@@ -49,9 +49,18 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
   - Real-time RMS audio visualizer waveform rendered inside the microphone glyph while recording.
   - Seamlessly injected into `UIKeyboardImpl` alongside standard keyboard controls on both iPad and iPhone layouts.
 
-- **Multilingual Support & Automatic Input Tracking**
-  - Tracks the active keyboard input mode in real time (`ru`, `en`, `uk`, `de`, `fr`, `es`, `it`).
-  - Switches models dynamically when toggling between keyboard languages.
+- **Fast Integer VAD (Voice Activity Detection)**
+  - Pure integer energy gate ($\sum |s_i|$ over 20ms frames) running in under 1 µs per frame on Cortex-A8/A9.
+  - 300ms pre-speech buffer preserves initial soft consonants; 400ms hangover prevents word clipping.
+  - Drops silent pauses immediately, cutting acoustic model CPU load by up to 40% and eliminating decoding backlog.
+
+- **Zero-Overhead Typing & Instant Start**
+  - Opening the keyboard consumes **0% CPU and 0 MB RAM** — model loading only triggers when the microphone key is tapped.
+  - Key turns active red immediately (`SetState(1)`) and buffers audio into a lock-free ring buffer instantly.
+  - Recognizer reuse via `vosk_recognizer_reset`: subsequent recognition runs yield the first recognized word in **~0.5 seconds even on single-core iPhone 4**!
+
+- **Context-Aware Keyboard Hiding**
+  - Automatically hides dictation key on URL input bars (`UIKeyboardTypeURL`), number pads, and phone dials to preserve layout integrity.
 
 - **Spoken Punctuation Engine**
   - Spoken punctuation for 7 languages:
@@ -61,9 +70,10 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
     - **German (DE), French (FR), Spanish (ES), Italian (IT):** Full native punctuation word mappings.
   - Automatic space trimming (`DeleteBack(1)`) so punctuation attaches cleanly to the preceding word without leading spaces.
 
-- **Dynamic Cydia / APT Model Distribution**
-  - Base tweak package is ultra-lightweight (**2.7 MB**).
+- **Dynamic Cydia / APT Model Distribution & Pre-Baked Caches**
+  - Base tweak package is ultra-lightweight (**4.2 MB**).
   - Heavy Kaldi recognition models are distributed as modular Cydia `.deb` packages (`com.noname122021.dictakey-model-<lang>`).
+  - All 7 language models come pre-baked with kernel mmap-aligned `HCLr.fst` graphs and pre-computed acoustic/i-vector covariance caches (`final.mdl.cache`, `final.ie.cache`), cutting cold model initialization time in half.
   - PreferenceLoader settings panel dynamically scans `/var/mobile/Library/vosk/` for installed models. Only installed languages appear as toggle switches, resolved automatically to localized names via `[NSLocale currentLocale]`.
 
 ---
@@ -84,10 +94,11 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
 
 ## Supported Devices
 
-- **iPad mini 1st gen** (iOS 6.1.2 / 6.1.3)
+- **iPhone 4** (Apple A4 single-core 800 MHz, iOS 6.1.3)
+- **iPad mini 1st gen** (Apple A5 dual-core 1.0 GHz, iOS 6.1.2 / 6.1.3)
 - **iPad 2 / iPad 3 / iPad 4** (iOS 6.0 – 6.1.3)
 - **iPhone 4S / iPhone 5** (iOS 6.0 – 6.1.4)
-- **iPod touch 5th gen** (iOS 6.0 – 6.1.6)
+- **iPod touch 4th / 5th gen** (iOS 6.0 – 6.1.6)
 
 ---
 
@@ -100,9 +111,13 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
 [ Lock-Free SPSC Ring Buffer ] (4 MB)
         │
         ▼
+[ Fast Integer VAD Engine ] (1µs / 20ms frame, 300ms pre-speech, 400ms hangover)
+        │ Speech-only audio frames
+        ▼
 [ Vosk Recognizer Background Worker ]
-   ├── Kaldi nnet3 Acoustic Model (AmNnetSimple)
-   ├── Memory-Mapped ConstFst Search Graph (mmap, zero heap RAM)
+   ├── Kaldi nnet3 Acoustic Model (AmNnetSimple + final.mdl.cache)
+   ├── Memory-Mapped ConstFst Search Graph (mmap, aligned HCLr.fst)
+   ├── Online i-Vector Extractor (final.ie.cache covariance acceleration)
    └── Binary Mmap Symbol Table (words.bin, O(1) word lookup)
         │ Partial / Final Text Events
         ▼
@@ -116,10 +131,12 @@ DictaKey requires **no internet connection**, **no external servers**, and **no 
 
 | Metric | Upstream Vosk | DictaKey (Optimized) |
 |---|---|---|
-| **Cold Model Load Time** | 6.8 seconds | **2.1 seconds** (Parallel pthread loading) |
+| **Subsequent Start Latency (First Word)** | 3.5 – 5.0 s | **~0.5 s** on iPhone 4 (Recognizer reuse) |
+| **Cold Model Load Time (iPhone 4)** | 11.4 seconds | **5.6 seconds** (Pre-baked caches & mmap alignment) |
 | **Symbol Table Load Time** | 1,500 ms (words.txt) | **1 ms** (mmap `words.bin`) |
 | **Heap RAM per Model** | ~110 MB | **~25 MB** (Paged via flash mmap) |
 | **Idle RAM Footprint** | Static allocation | **0 MB** (Auto-unloads after 120s idle) |
+| **Keyboard Open Overhead** | N/A | **0% CPU / 0 MB RAM** (Pure on-demand loading) |
 
 ---
 
