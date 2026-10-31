@@ -64,6 +64,7 @@ static UIView *g_owner = nil;
 static VoskModel *g_model = nil;
 static NSString *g_loadedModelLang = nil;
 static VoskRecognizer *g_rec = nil;
+static pthread_mutex_t s_vosk_mutex = PTHREAD_MUTEX_INITIALIZER;
 static AudioUnit g_au = NULL;
 static BOOL g_audioOn = NO;
 
@@ -89,6 +90,7 @@ static char s_rb[RB_SIZE];
 static volatile long s_rb_w = 0, s_rb_r = 0;
 static volatile BOOL s_worker_quit = NO;
 static volatile BOOL s_recording = NO;
+static volatile int s_mainQueuePending = 0;
 static pthread_t s_worker = 0;
 static BOOL s_workerAlive = NO;
 static long g_cbCount = 0, g_cbBytes = 0, g_dropBytes = 0;
@@ -113,12 +115,48 @@ static void NotifyTextChange(id impl) {
     if (!impl) return;
     if ([impl respondsToSelector:@selector(updateReturnKey)])
         [impl performSelector:@selector(updateReturnKey)];
+
     id delegate = [impl respondsToSelector:@selector(delegate)] ? [impl performSelector:@selector(delegate)] : nil;
-    if (delegate) {
-        if ([delegate respondsToSelector:@selector(sendActionsForControlEvents:)])
-            [delegate performSelector:@selector(sendActionsForControlEvents:) withObject:(id)(intptr_t)UIControlEventEditingChanged];
-        [[NSNotificationCenter defaultCenter]
-            postNotificationName:UITextFieldTextDidChangeNotification object:delegate];
+    id inputDelegate = [impl respondsToSelector:@selector(inputDelegate)] ? [impl performSelector:@selector(inputDelegate)] : nil;
+    id target = delegate ?: inputDelegate;
+    if (!target) return;
+
+    if ([target respondsToSelector:@selector(sendActionsForControlEvents:)]) {
+        [target performSelector:@selector(sendActionsForControlEvents:)
+                     withObject:(id)(intptr_t)UIControlEventEditingChanged];
+    }
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:UITextFieldTextDidChangeNotification object:target];
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:UITextViewTextDidChangeNotification object:target];
+
+    if ([target respondsToSelector:@selector(webViewDidChange:)]) {
+        [target performSelector:@selector(webViewDidChange:) withObject:nil];
+    }
+
+    if ([target respondsToSelector:@selector(delegate)]) {
+        id tvDel = [target performSelector:@selector(delegate)];
+        if (tvDel && [tvDel respondsToSelector:@selector(textViewDidChange:)]) {
+            [tvDel performSelector:@selector(textViewDidChange:) withObject:target];
+        }
+    }
+
+    if ([target isKindOfClass:objc_getClass("UIView")]) {
+        UIView *parent = [(UIView *)target superview];
+        while (parent) {
+            [[NSNotificationCenter defaultCenter]
+                postNotificationName:UITextViewTextDidChangeNotification object:parent];
+            if ([parent respondsToSelector:@selector(webViewDidChange:)]) {
+                [parent performSelector:@selector(webViewDidChange:) withObject:nil];
+            }
+            if ([parent respondsToSelector:@selector(delegate)]) {
+                id pDel = [parent performSelector:@selector(delegate)];
+                if (pDel && [pDel respondsToSelector:@selector(textViewDidChange:)]) {
+                    [pDel performSelector:@selector(textViewDidChange:) withObject:parent];
+                }
+            }
+            parent = [parent superview];
+        }
     }
 }
 
@@ -140,13 +178,6 @@ static void DeleteBack(int n) {
             [impl performSelector:@selector(deleteBackward)];
     }
     NotifyTextChange(impl);
-}
-
-static void ClearPartial(void) {
-    int len = g_partialLen;
-    g_partialLen = 0; g_lastPartial = @"";
-    if (len > 0)
-        dispatch_async(dispatch_get_main_queue(), ^{ DeleteBack(len); });
 }
 
 static NSString *JsonText(const char *json, NSString *key) {
@@ -222,6 +253,28 @@ static NSString *ApplyPunctuation(NSString *text, NSString *lang) {
     return text;
 }
 
+static void CommitSegment(NSString *seg) {
+    int len = g_partialLen;
+    g_partialLen = 0;
+    g_lastPartial = @"";
+    if (!seg.length && len == 0) return;
+
+    NSString *lang = g_loadedModelLang ?: @"ru";
+    NSString *fmt = seg.length ? ApplyPunctuation(seg, lang) : nil;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (len > 0) {
+            DeleteBack(len);
+        }
+        if (fmt.length) {
+            if (s_lastWasSpace && ([fmt hasPrefix:@","] || [fmt hasPrefix:@":"] || [fmt hasPrefix:@"—"])) {
+                DeleteBack(1);
+            }
+            InsertText([fmt stringByAppendingString:@" "]);
+            s_lastWasSpace = YES;
+        }
+    });
+}
+
 // ---- Language and Model Resolution ----
 static NSString *GetActiveKeyboardLang(void) {
     id mode = [UITextInputMode currentInputMode];
@@ -264,6 +317,7 @@ static NSString *ModelPathForLang(NSString *lang) {
 static double s_lastActivityTime = 0;
 
 static void FreeLoadedModel(void) {
+    pthread_mutex_lock(&s_vosk_mutex);
     if (g_rec) {
         vosk_recognizer_free(g_rec);
         g_rec = NULL;
@@ -275,6 +329,7 @@ static void FreeLoadedModel(void) {
         g_loadedModelLang = nil;
         DBGLog(@"model and recognizer freed from memory");
     }
+    pthread_mutex_unlock(&s_vosk_mutex);
 }
 
 static void EnsureModelLoadedForLang(NSString *lang) {
@@ -290,6 +345,7 @@ static void EnsureModelLoadedForLang(NSString *lang) {
     s_loading = YES;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         double t0 = [NSDate timeIntervalSinceReferenceDate];
+        pthread_mutex_lock(&s_vosk_mutex);
         if (g_rec) {
             vosk_recognizer_free(g_rec);
             g_rec = NULL;
@@ -305,6 +361,7 @@ static void EnsureModelLoadedForLang(NSString *lang) {
             g_loadedModelLang = [lang copy];
             g_rec = vosk_recognizer_new(g_model, 16000.0);
         }
+        pthread_mutex_unlock(&s_vosk_mutex);
         s_lastActivityTime = [NSDate timeIntervalSinceReferenceDate];
         DBGLog([NSString stringWithFormat:@"model-%@ loaded %.1fs ok=%d rec=%d",
             lang, [NSDate timeIntervalSinceReferenceDate] - t0, g_model != nil, g_rec != nil]);
@@ -430,6 +487,7 @@ static void *WorkerFn(void *arg) {
     int pre_head = 0, pre_count = 0;
     int is_speech = 0;
     int hangover = 0;
+    int speech_frames = 0;
 
     short chunk[3200];
     int chunk_filled = 0;
@@ -454,6 +512,7 @@ static void *WorkerFn(void *arg) {
         if (frame_is_speech) {
             if (!is_speech) {
                 is_speech = 1;
+                speech_frames = 0;
                 if (pre_count > 0) {
                     int start = (pre_head - pre_count + VAD_PRE_FRAMES) % VAD_PRE_FRAMES;
                     for (int k = 0; k < pre_count; k++) {
@@ -461,7 +520,11 @@ static void *WorkerFn(void *arg) {
                         memcpy(&chunk[chunk_filled], pre_buf[f_idx], VAD_FRAME_BYTES);
                         chunk_filled += VAD_FRAME_SAMPLES;
                         if (chunk_filled >= 3200) {
-                            vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                            pthread_mutex_lock(&s_vosk_mutex);
+                            if (g_rec) {
+                                vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                            }
+                            pthread_mutex_unlock(&s_vosk_mutex);
                             chunk_filled = 0;
                         }
                     }
@@ -478,6 +541,21 @@ static void *WorkerFn(void *arg) {
                 } else {
                     is_speech = 0;
                     send_frame = 0;
+                    speech_frames = 0;
+                    // VAD pause detected (speech ended, >=400ms silence): finalize phrase
+                    NSString *seg = nil;
+                    pthread_mutex_lock(&s_vosk_mutex);
+                    if (chunk_filled > 0 && g_rec) {
+                        vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                        chunk_filled = 0;
+                    }
+                    if (g_rec) {
+                        seg = JsonText(vosk_recognizer_result(g_rec), @"text");
+                    }
+                    pthread_mutex_unlock(&s_vosk_mutex);
+                    if (seg) {
+                        CommitSegment(seg);
+                    }
                 }
             } else {
                 send_frame = 0;
@@ -485,25 +563,41 @@ static void *WorkerFn(void *arg) {
         }
 
         if (send_frame) {
+            speech_frames++;
             memcpy(&chunk[chunk_filled], frame, VAD_FRAME_BYTES);
             chunk_filled += VAD_FRAME_SAMPLES;
             if (chunk_filled >= 3200) {
-                BOOL done = vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled) != 0;
+                BOOL done = NO;
+                NSString *seg = nil;
+                pthread_mutex_lock(&s_vosk_mutex);
+                if (g_rec) {
+                    done = vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled) != 0;
+                    if (done) {
+                        seg = JsonText(vosk_recognizer_result(g_rec), @"text");
+                    }
+                }
+                pthread_mutex_unlock(&s_vosk_mutex);
                 chunk_filled = 0;
                 if (done) {
-                    ClearPartial();
-                    NSString *seg = JsonText(vosk_recognizer_result(g_rec), @"text");
-                    if (seg.length) {
-                        NSString *lang = g_loadedModelLang ?: @"ru";
-                        NSString *fmt = ApplyPunctuation(seg, lang);
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            if (s_lastWasSpace && ([fmt hasPrefix:@","] || [fmt hasPrefix:@":"] || [fmt hasPrefix:@"—"])) {
-                                DeleteBack(1);
-                            }
-                            InsertText([fmt stringByAppendingString:@" "]);
-                            s_lastWasSpace = YES;
-                        });
-                    }
+                    speech_frames = 0;
+                    if (seg) CommitSegment(seg);
+                }
+            }
+            // Continuous speech cap: every 8s (400 frames) of non-stop talk, commit segment
+            if (speech_frames >= 400) {
+                speech_frames = 0;
+                NSString *seg = nil;
+                pthread_mutex_lock(&s_vosk_mutex);
+                if (chunk_filled > 0 && g_rec) {
+                    vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
+                    chunk_filled = 0;
+                }
+                if (g_rec) {
+                    seg = JsonText(vosk_recognizer_result(g_rec), @"text");
+                }
+                pthread_mutex_unlock(&s_vosk_mutex);
+                if (seg) {
+                    CommitSegment(seg);
                 }
             }
         } else {
@@ -513,30 +607,40 @@ static void *WorkerFn(void *arg) {
         }
 
         double now = [NSDate timeIntervalSinceReferenceDate];
-        if (is_speech && (now - lastPartialT > 0.20)) {
+        if (is_speech && (now - lastPartialT > 0.25)) {
             lastPartialT = now;
-            if (chunk_filled > 0) {
+            NSString *pt = nil;
+            pthread_mutex_lock(&s_vosk_mutex);
+            if (chunk_filled > 0 && g_rec) {
                 vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
                 chunk_filled = 0;
             }
-            const char *pr = vosk_recognizer_partial_result(g_rec);
-            NSString *pt = JsonText(pr, @"partial") ?: @"";
-            if (![pt isEqualToString:g_lastPartial]) {
-                int len = g_partialLen;
-                g_partialLen = (int)pt.length;
-                g_lastPartial = pt;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    DeleteBack(len);
-                    if (pt.length) InsertText(pt);
-                });
+            if (g_rec) {
+                const char *pr = vosk_recognizer_partial_result(g_rec);
+                pt = JsonText(pr, @"partial") ?: @"";
+            }
+            pthread_mutex_unlock(&s_vosk_mutex);
+            if (pt && ![pt isEqualToString:g_lastPartial]) {
+                if (__sync_bool_compare_and_swap(&s_mainQueuePending, 0, 1)) {
+                    int len = g_partialLen;
+                    g_partialLen = (int)pt.length;
+                    g_lastPartial = [pt copy];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        DeleteBack(len);
+                        if (pt.length) InsertText(pt);
+                        s_mainQueuePending = 0;
+                    });
+                }
             }
         }
     }
 
+    pthread_mutex_lock(&s_vosk_mutex);
     if (chunk_filled > 0 && g_rec) {
         vosk_recognizer_accept_waveform_s(g_rec, chunk, chunk_filled);
         chunk_filled = 0;
     }
+    pthread_mutex_unlock(&s_vosk_mutex);
     return NULL;
 }
 
@@ -545,6 +649,9 @@ static void StartRecordingFull(void) {
     EnsureModelLoadedForLang(lang);
     g_cbCount = 0; g_cbBytes = 0; g_dropBytes = 0;
     s_rb_w = s_rb_r = 0; s_worker_quit = NO;
+    s_mainQueuePending = 0;
+    g_partialLen = 0;
+    g_lastPartial = @"";
     s_lastWasSpace = NO;
     StartAudio();
     SetState(1); // Audio recording starts immediately
@@ -575,26 +682,19 @@ static void StopRecordingBg(void) {
         pthread_join(s_worker, NULL);
         s_workerAlive = NO;
     }
-    ClearPartial();
+    pthread_mutex_lock(&s_vosk_mutex);
     if (g_rec) {
         @try {
             NSString *seg = JsonText(vosk_recognizer_final_result(g_rec), @"text");
-            if (seg.length) {
-                NSString *lang = g_loadedModelLang ?: @"ru";
-                NSString *fmt = ApplyPunctuation(seg, lang);
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (s_lastWasSpace && ([fmt hasPrefix:@","] || [fmt hasPrefix:@":"] || [fmt hasPrefix:@"—"])) {
-                        DeleteBack(1);
-                    }
-                    InsertText([fmt stringByAppendingString:@" "]);
-                    s_lastWasSpace = YES;
-                });
-            }
+            CommitSegment(seg);
         } @catch (id e) { DBGLog(@"final exc"); }
         vosk_recognizer_reset(g_rec);
         DBGLog([NSString stringWithFormat:@"stop %.1fs cb=%ld bytes=%ld drop=%ld",
             [NSDate timeIntervalSinceReferenceDate] - t0, g_cbCount, g_cbBytes, g_dropBytes]);
+    } else {
+        CommitSegment(nil);
     }
+    pthread_mutex_unlock(&s_vosk_mutex);
     dispatch_async(dispatch_get_main_queue(), ^{ SetState(0); });
 }
 
